@@ -830,6 +830,12 @@ then
 
     # Certificate extensions and alt. names for FPKI use
     AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_SUBJ_DIR_ATTR -DWOLFSSL_FPKI -DWOLFSSL_SUBJ_INFO_ACC"
+
+    # Handle as many subject/issuer name OIDs as possible
+    AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_CERT_NAME_ALL"
+
+    # More thorough error queue usage.
+    AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_VERBOSE_ERRORS"
 fi
 
 
@@ -1030,6 +1036,25 @@ if test "x$FIPS_VERSION" = "xv1" ||
 then
     ENABLED_TLS13="no"
 fi
+
+# QUIC support
+AC_ARG_ENABLE([quic],
+    [AS_HELP_STRING([--enable-quic],[Enable QUIC API with wolfSSL TLS v1.3 (default: disabled)])],
+    [ ENABLED_QUIC=$enableval ],
+    [ ENABLED_QUIC=no ]
+    )
+
+if test "$ENABLED_QUIC" = "yes"
+then
+    if test "x$ENABLED_TLS13" = "xno"
+    then
+        AC_MSG_ERROR([TLS 1.3 is disabled - necessary for QUIC])
+    fi
+    AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_QUIC"
+    # QUIC proto handlers need app_data at WOLFSSL*
+    AM_CFLAGS="$AM_CFLAGS -DHAVE_EX_DATA"
+fi
+
 
 # Post-handshake Authentication
 AC_ARG_ENABLE([postauth],
@@ -1470,6 +1495,12 @@ AC_ARG_ENABLE([opensslextra],
     [ ENABLED_OPENSSLEXTRA=$enableval ],
     [ ENABLED_OPENSSLEXTRA=no ]
     )
+
+if test "$ENABLED_QUIC" = "yes"
+then
+    ENABLED_OPENSSLEXTRA="yes"
+fi
+
 
 # One Error Queue per Thread
 AC_ARG_ENABLE([error-queue-per-thread],
@@ -1933,6 +1964,11 @@ AC_ARG_ENABLE([aesctr],
     [ ENABLED_AESCTR=no ]
     )
 if test "$ENABLED_OPENVPN" = "yes" || test "$ENABLED_LIBSSH2" = "yes" || test "$ENABLED_AESSIV" = "yes" || test "$ENABLED_WOLFENGINE" = "yes"
+then
+    ENABLED_AESCTR=yes
+fi
+
+if test "$ENABLED_QUIC" = "yes"
 then
     ENABLED_AESCTR=yes
 fi
@@ -2890,6 +2926,10 @@ AC_ARG_ENABLE([curve25519],
     [ ENABLED_CURVE25519=no ]
     )
 
+if test "$ENABLED_QUIC" = "yes" && test "$ENABLED_CURVE25519" = "no"
+then
+    ENABLED_CURVE25519=yes
+fi
 
 if test "$ENABLED_OPENSSH" = "yes" && test "x$ENABLED_FIPS" = "xno"
 then
@@ -3041,7 +3081,7 @@ fi
 
 # ECC encrypt
 AC_ARG_ENABLE([eccencrypt],
-    [AS_HELP_STRING([--enable-eccencrypt],[Enable ECC encrypt (default: disabled). yes = SEC1 standard, iso18033 = ISO 18033 standard, old = original wolfSSL algorithm])],
+    [AS_HELP_STRING([--enable-eccencrypt],[Enable ECC encrypt (default: disabled). yes = SEC1 standard, geniv = Generate IV, iso18033 = ISO 18033 standard, old = original wolfSSL algorithm])],
     [ ENABLED_ECC_ENCRYPT=$enableval ],
     [ ENABLED_ECC_ENCRYPT=no ]
     )
@@ -3064,6 +3104,10 @@ then
     if test "$ENABLED_ECC_ENCRYPT" = "iso18033"
     then
         AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_ECIES_ISO18033"
+    fi
+    if test "$ENABLED_ECC_ENCRYPT" = "geniv"
+    then
+        AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_ECIES_GEN_IV"
     fi
 fi
 
@@ -3533,7 +3577,7 @@ else
 fi
 if test "$ENABLED_RSAPSS" = "yes"
 then
-    AM_CFLAGS="$AM_CFLAGS -DWC_RSA_PSS"
+    AM_CFLAGS="$AM_CFLAGS -DWC_RSA_PSS -DWOLFSSL_PSS_LONG_SALT"
 fi
 
 
@@ -3676,7 +3720,7 @@ then
     then
         AC_MSG_ERROR([cannot enable eccencrypt and hkdf without aes.])
     fi
-    if test "$ENABLED_AESGCM" = "yes"
+    if test "$ENABLED_AESGCM" != "no"
     then
         AC_MSG_ERROR([AESGCM requires AES.])
     fi
@@ -3714,6 +3758,21 @@ then
   then
       AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_AES_DIRECT"
   fi
+fi
+
+# DTLS CID support
+AC_ARG_ENABLE([dtlscid],
+    [AS_HELP_STRING([--enable-dtlscid],[Enable wolfSSL DTLS ConnectionID (default: disabled)])],
+    [ ENABLED_DTLS_CID=$enableval ],
+    [ ENABLED_DTLS_CID=no ]
+    )
+if test "x$ENABLED_DTLS_CID" = "xyes"
+then
+        if test "x$ENABLED_DTLS13" != "xyes"
+        then
+                AC_MSG_ERROR([You need to enable DTLSv1.3 to use DTLS ConnectionID])
+        fi
+  AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_DTLS_CID"
 fi
 
 # CODING
@@ -4540,6 +4599,11 @@ then
     ENABLED_SNI="yes"
 fi
 
+if test "$ENABLED_QUIC" = "yes"
+then
+    ENABLED_SNI=yes
+fi
+
 if test "x$ENABLED_SNI" = "xyes"
 then
     AM_CFLAGS="$AM_CFLAGS -DHAVE_TLS_EXTENSIONS -DHAVE_SNI"
@@ -4560,6 +4624,11 @@ AC_ARG_ENABLE([alpn],
     )
 
 if test "$ENABLED_BIND" = "yes"
+then
+    ENABLED_ALPN=yes
+fi
+
+if test "$ENABLED_QUIC" = "yes"
 then
     ENABLED_ALPN=yes
 fi
@@ -4822,7 +4891,6 @@ if test "$ENABLED_TLSV12" = "no" && test "$ENABLED_TLS13" = "yes" && test "x$ENA
 then
     AM_CFLAGS="$AM_CFLAGS -DNO_SESSION_CACHE"
 fi
-
 
 # PKCS7
 AC_ARG_ENABLE([pkcs7],
@@ -5649,6 +5717,15 @@ then
         ENABLED_ALT_CERT_CHAINS="yes"
         AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_ALT_CERT_CHAINS"
     fi
+
+    if test "x$ENABLED_SESSION_TICKET" = "xno"
+    then
+        ENABLED_SESSION_TICKET="yes"
+        AM_CFLAGS="$AM_CFLAGS -DHAVE_TLS_EXTENSIONS -DHAVE_SESSION_TICKET"
+    fi
+
+    # FTPS server requires pointer to session cache
+    AM_CFLAGS="$AM_CFLAGS -DNO_SESSION_CACHE_REF"
 
     AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_DES_ECB"
 fi
@@ -7450,7 +7527,7 @@ then
 fi
 
 AS_IF([test "x$ENABLED_OPENSSLALL" = "xyes"],
-      [AM_CFLAGS="$AM_CFLAGS -DOPENSSL_ALL -DWOLFSSL_EITHER_SIDE -DWC_RSA_NO_PADDING -DWC_RSA_PSS -DWOLFSSL_PSS_LONG_SALT -DWOLFSSL_TICKET_HAVE_ID -DWOLFSSL_ERROR_CODE_OPENSSL"])
+      [AM_CFLAGS="$AM_CFLAGS -DOPENSSL_ALL -DWOLFSSL_EITHER_SIDE -DWC_RSA_NO_PADDING -DWC_RSA_PSS -DWOLFSSL_PSS_LONG_SALT -DWOLFSSL_TICKET_HAVE_ID -DWOLFSSL_ERROR_CODE_OPENSSL -DWOLFSSL_CERT_NAME_ALL"])
 
 AS_IF([test "x$ENABLED_AESSIV" = "xyes"], [AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_AES_SIV"])
 
@@ -7808,8 +7885,8 @@ if test "x$ENABLED_LINUXKM" = "xyes"; then
     AC_SUBST([ASFLAGS_FPUSIMD_DISABLE])
     AC_SUBST([ASFLAGS_FPUSIMD_ENABLE])
 
-    if test "$ENABLED_OPENSSLEXTRA" != "no"; then
-        AC_MSG_ERROR([--enable-opensslextra is incompatible with --enable-linuxkm.])
+    if test "$ENABLED_OPENSSLEXTRA" != "no" && test "$ENABLED_CRYPTONLY" = "no"; then
+        AC_MSG_ERROR([--enable-opensslextra without --enable-cryptonly is incompatible with --enable-linuxkm.])
     fi
     if test "$ENABLED_FILESYSTEM" = "yes"; then
         AC_MSG_ERROR([--enable-filesystem is incompatible with --enable-linuxkm.])
@@ -8014,6 +8091,8 @@ AM_CONDITIONAL([BUILD_ERROR_STRINGS],[test "x$ENABLED_ERROR_STRINGS" = "xyes"])
 AM_CONDITIONAL([BUILD_DO178],[test "x$ENABLED_DO178" = "xyes"])
 AM_CONDITIONAL([BUILD_PSA],[test "x$ENABLED_PSA" = "xyes"])
 AM_CONDITIONAL([BUILD_DTLS13],[test "x$ENABLED_DTLS13" = "xyes"])
+AM_CONDITIONAL([BUILD_QUIC],[test "x$ENABLED_QUIC" = "xyes"])
+AM_CONDITIONAL([BUILD_DTLS_CID],[test "x$ENABLED_DTLS_CID" = "xyes"])
 
 if test "$ENABLED_REPRODUCIBLE_BUILD" != "yes" &&
    (test "$ax_enable_debug" = "yes" ||
@@ -8362,6 +8441,7 @@ echo "   * TLS v1.2:                   $ENABLED_TLSV12"
 echo "   * TLS v1.3:                   $ENABLED_TLS13"
 echo "   * Post-handshake Auth:        $ENABLED_TLS13_POST_AUTH"
 echo "   * Early Data:                 $ENABLED_TLS13_EARLY_DATA"
+echo "   * QUIC:                       $ENABLED_QUIC"
 echo "   * Send State in HRR Cookie:   $ENABLED_SEND_HRR_COOKIE"
 echo "   * OCSP:                       $ENABLED_OCSP"
 echo "   * OCSP Stapling:              $ENABLED_CERTIFICATE_STATUS_REQUEST"

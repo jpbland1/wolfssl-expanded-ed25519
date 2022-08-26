@@ -1,6 +1,6 @@
 /* wolfcaam_aes.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2022 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -25,7 +25,7 @@
 
 #include <wolfssl/wolfcrypt/settings.h>
 
-#if (WOLFSSL_CAAM) && !defined(NO_AES)
+#if defined(WOLFSSL_CAAM) && !defined(NO_AES)
 
 #include <wolfssl/wolfcrypt/logging.h>
 #include <wolfssl/wolfcrypt/error-crypt.h>

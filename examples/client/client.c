@@ -1,6 +1,6 @@
 /* client.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2022 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -616,9 +616,6 @@ static int ClientBenchmarkConnections(WOLFSSL_CTX* ctx, char* host, word16 port,
             do {
                 err = 0; /* reset error */
                 ret = wolfSSL_connect(ssl);
-#ifdef WOLFSSL_EARLY_DATA
-                EarlyDataStatus(ssl);
-#endif
                 if (ret != WOLFSSL_SUCCESS) {
                     err = wolfSSL_get_error(ssl, 0);
                 #ifdef WOLFSSL_ASYNC_CRYPT
@@ -630,6 +627,9 @@ static int ClientBenchmarkConnections(WOLFSSL_CTX* ctx, char* host, word16 port,
                 #endif
                 }
             } while (err == WC_PENDING_E);
+        #ifdef WOLFSSL_EARLY_DATA
+            EarlyDataStatus(ssl);
+        #endif
             if (ret != WOLFSSL_SUCCESS) {
                 err_sys("SSL_connect failed");
             }
@@ -1306,14 +1306,14 @@ static const char* client_usage_msg[][70] = {
            " SSLv3(0) - TLS1.3(4)\n",                                   /* 69 */
 #endif
 #ifdef HAVE_PQC
-        "--pqc <alg> Key Share with specified post-quantum algorithm only [KYBER_LEVEL1, KYBER_LEVEL3,\n",
-        "            KYBER_LEVEL5, KYBER_90S_LEVEL1, KYBER_90S_LEVEL3, KYBER_90S_LEVEL5,\n",
-        "            NTRU_HPS_LEVEL1, NTRU_HPS_LEVEL3, NTRU_HPS_LEVEL5, NTRU_HRSS_LEVEL3,\n",
-        "            SABER_LEVEL1, SABER_LEVEL3, SABER_LEVEL5, P256_NTRU_HPS_LEVEL1,\n"
-        "            P384_NTRU_HPS_LEVEL3, P521_NTRU_HPS_LEVEL5, P384_NTRU_HRSS_LEVEL3,\n"
-        "            P256_SABER_LEVEL1, P384_SABER_LEVEL3, P521_SABER_LEVEL5, P256_KYBER_LEVEL1,\n"
-        "            P384_KYBER_LEVEL3, P521_KYBER_LEVEL5, P256_KYBER_90S_LEVEL1, P384_KYBER_90S_LEVEL3,\n"
-        "            P521_KYBER_90S_LEVEL5]\n",                         /* 70 */
+        "--pqc <alg> Key Share with specified post-quantum algorithm only [KYBER_LEVEL1, KYBER_LEVEL3,\n"
+            "            KYBER_LEVEL5, KYBER_90S_LEVEL1, KYBER_90S_LEVEL3, KYBER_90S_LEVEL5,\n"
+            "            NTRU_HPS_LEVEL1, NTRU_HPS_LEVEL3, NTRU_HPS_LEVEL5, NTRU_HRSS_LEVEL3,\n"
+            "            SABER_LEVEL1, SABER_LEVEL3, SABER_LEVEL5, P256_NTRU_HPS_LEVEL1,\n"
+            "            P384_NTRU_HPS_LEVEL3, P521_NTRU_HPS_LEVEL5, P384_NTRU_HRSS_LEVEL3,\n"
+            "            P256_SABER_LEVEL1, P384_SABER_LEVEL3, P521_SABER_LEVEL5, P256_KYBER_LEVEL1,\n"
+            "            P384_KYBER_LEVEL3, P521_KYBER_LEVEL5, P256_KYBER_90S_LEVEL1, P384_KYBER_90S_LEVEL3,\n"
+            "            P521_KYBER_90S_LEVEL5]\n",                         /* 70 */
 #endif
 #ifdef WOLFSSL_SRTP
         "--srtp <profile> (default is SRTP_AES128_CM_SHA1_80)\n",       /* 71 */
@@ -1527,14 +1527,14 @@ static const char* client_usage_msg[][70] = {
         " SSLv3(0) - TLS1.3(4)\n",                            /* 69 */
 #endif
 #ifdef HAVE_PQC
-        "--pqc <alg> post-quantum 名前付きグループとの鍵共有のみ [KYBER_LEVEL1, KYBER_LEVEL3,\n",
-        "            KYBER_LEVEL5, KYBER_90S_LEVEL1, KYBER_90S_LEVEL3, KYBER_90S_LEVEL5,\n",
-        "            NTRU_HPS_LEVEL1, NTRU_HPS_LEVEL3, NTRU_HPS_LEVEL5, NTRU_HRSS_LEVEL3,\n",
-        "            SABER_LEVEL1, SABER_LEVEL3, SABER_LEVEL5, P256_NTRU_HPS_LEVEL1,\n"
-        "            P384_NTRU_HPS_LEVEL3, P521_NTRU_HPS_LEVEL5, P384_NTRU_HRSS_LEVEL3,\n"
-        "            P256_SABER_LEVEL1, P384_SABER_LEVEL3, P521_SABER_LEVEL5, P256_KYBER_LEVEL1,\n"
-        "            P384_KYBER_LEVEL3, P521_KYBER_LEVEL5, P256_KYBER_90S_LEVEL1, P384_KYBER_90S_LEVEL3,\n"
-        "            P521_KYBER_90S_LEVEL5]\n",                  /* 70 */
+        "--pqc <alg> post-quantum 名前付きグループとの鍵共有のみ [KYBER_LEVEL1, KYBER_LEVEL3,\n"
+            "            KYBER_LEVEL5, KYBER_90S_LEVEL1, KYBER_90S_LEVEL3, KYBER_90S_LEVEL5,\n"
+            "            NTRU_HPS_LEVEL1, NTRU_HPS_LEVEL3, NTRU_HPS_LEVEL5, NTRU_HRSS_LEVEL3,\n"
+            "            SABER_LEVEL1, SABER_LEVEL3, SABER_LEVEL5, P256_NTRU_HPS_LEVEL1,\n"
+            "            P384_NTRU_HPS_LEVEL3, P521_NTRU_HPS_LEVEL5, P384_NTRU_HRSS_LEVEL3,\n"
+            "            P256_SABER_LEVEL1, P384_SABER_LEVEL3, P521_SABER_LEVEL5, P256_KYBER_LEVEL1,\n"
+            "            P384_KYBER_LEVEL3, P521_KYBER_LEVEL5, P256_KYBER_90S_LEVEL1, P384_KYBER_90S_LEVEL3,\n"
+            "            P521_KYBER_90S_LEVEL5]\n",                  /* 70 */
 #endif
 #ifdef WOLFSSL_SRTP
         "--srtp <profile> (デフォルトは SRTP_AES128_CM_SHA1_80)\n", /* 71 */
@@ -1894,6 +1894,9 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
          *  --waitTicket in the command line and fail */
         {"waitTicket", 0, 261},
 #endif /* WOLFSSL_DTLS13 */
+#ifdef WOLFSSL_DTLS_CID
+        {"cid", 2, 262},
+#endif /* WOLFSSL_DTLS_CID */
         { 0, 0, 0 }
     };
 #endif
@@ -2023,6 +2026,10 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 #ifdef HAVE_SESSION_TICKET
     int waitTicket = 0;
 #endif /* HAVE_SESSION_TICKET */
+#ifdef WOLFSSL_DTLS_CID
+    int useDtlsCID = 0;
+    char dtlsCID[DTLS_CID_BUFFER_SIZE] = { 0 };
+#endif /* WOLFSSL_DTLS_CID */
 
     char buffer[WOLFSSL_MAX_ERROR_SZ];
 
@@ -2178,7 +2185,19 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 #endif /* HAVE_SESSION_TICKET */
             break;
 #endif /* WOLFSSL_DTLS13 */
-
+#ifdef WOLFSSL_DTLS_CID
+        case 262:
+            useDtlsCID = 1;
+            if (myoptarg != NULL) {
+                if (XSTRLEN(myoptarg) >= DTLS_CID_BUFFER_SIZE) {
+                    err_sys("provided connection ID is too big");
+                }
+                else {
+                    strcpy(dtlsCID, myoptarg);
+                }
+            }
+            break;
+#endif /* WOLFSSL_CID */
             case 'G' :
             #ifdef WOLFSSL_SCTP
                 doDTLS = 1;
@@ -3709,6 +3728,18 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         SetupAtomicUser(ctx, ssl);
 #endif
 
+#ifdef WOLFSSL_DTLS_CID
+    if (useDtlsCID) {
+        ret = wolfSSL_dtls_cid_use(ssl);
+        if (ret != WOLFSSL_SUCCESS)
+            err_sys("Can't enable DTLS ConnectionID");
+        ret = wolfSSL_dtls_cid_set(ssl, (unsigned char*)dtlsCID,
+            (word32)XSTRLEN(dtlsCID));
+        if (ret != WOLFSSL_SUCCESS)
+            err_sys("Can't set DTLS ConnectionID");
+    }
+#endif /* WOLFSSL_DTLS_CID */
+
     if (matchName && doPeerCheck)
         wolfSSL_check_domain_name(ssl, domain);
 #ifndef WOLFSSL_CALLBACKS
@@ -3921,6 +3952,32 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
             printf("Getting ALPN protocol name failed\n");
     }
 #endif
+
+#ifdef WOLFSSL_DTLS_CID
+    if (useDtlsCID && wolfSSL_dtls_cid_is_enabled(ssl)) {
+        unsigned char receivedCID[DTLS_CID_BUFFER_SIZE];
+        unsigned int receivedCIDSz;
+
+        printf("CID extension was negotiated\n");
+        ret = wolfSSL_dtls_cid_get_tx_size(ssl, &receivedCIDSz);
+        if (ret != WOLFSSL_SUCCESS)
+            err_sys("Can't get negotiated DTLS CID size\n");
+
+        if (receivedCIDSz > 0) {
+            ret = wolfSSL_dtls_cid_get_tx(ssl, receivedCID,
+                DTLS_CID_BUFFER_SIZE - 1);
+            if (ret != WOLFSSL_SUCCESS)
+                err_sys("Can't get negotiated DTLS CID\n");
+
+            printf("Sending CID is ");
+            printBuffer(receivedCID, receivedCIDSz);
+            printf("\n");
+        }
+        else {
+            printf("other peer provided empty CID\n");
+        }
+    }
+#endif /* WOLFSSL_DTLS_CID */
 
 #ifdef HAVE_SECURE_RENEGOTIATION
     if (scr && forceScr) {

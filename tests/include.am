@@ -12,6 +12,7 @@ tests_unit_test_SOURCES = \
                   tests/hash.c \
                   tests/w64wrapper.c \
                   tests/srp.c \
+                  tests/quic.c \
                   examples/client/client.c \
                   examples/server/server.c
 tests_unit_test_CFLAGS       = -DNO_MAIN_DRIVER $(AM_CFLAGS) $(WOLFSENTRY_INCLUDE)
@@ -44,9 +45,11 @@ EXTRA_DIST += tests/unit.h \
               tests/test-dtls13.conf \
               tests/test-dtls13-downgrade.conf \
               tests/test-dtls13-psk.conf \
+              tests/test-dtls13-cid.conf \
               tests/test-sctp.conf \
               tests/test-sctp-sha2.conf \
               tests/test-sig.conf \
+              tests/test-rsapss.conf \
               tests/test-ed25519.conf \
               tests/test-ed448.conf \
               tests/test-enckeys.conf \

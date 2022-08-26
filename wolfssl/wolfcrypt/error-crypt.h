@@ -1,6 +1,6 @@
 /* error-crypt.h
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2022 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -269,7 +269,7 @@ enum {
 
 #else
 WOLFSSL_API void wc_ErrorString(int err, char* buff);
-WOLFSSL_API const char* wc_GetErrorString(int error);
+WOLFSSL_ABI WOLFSSL_API const char* wc_GetErrorString(int error);
 #endif
 
 #ifdef __cplusplus

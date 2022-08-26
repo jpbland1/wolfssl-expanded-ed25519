@@ -25,8 +25,12 @@
 
 #if defined(WOLFSSL_RENESAS_SCEPROTECT)
   #include <wolfssl/wolfcrypt/port/Renesas/renesas-sce-crypt.h>
+  #define cmn_hw_lock    wc_sce_hw_lock
+  #define cmn_hw_unlock  wc_sce_hw_unlock
 #elif defined(WOLFSSL_RENESAS_TSIP_TLS)
   #include <wolfssl/wolfcrypt/port/Renesas/renesas-tsip-crypt.h>
+  #define cmn_hw_lock    tsip_hw_lock
+  #define cmn_hw_unlock  tsip_hw_unlock
 #endif
 
 #include <wolfssl/wolfcrypt/wc_port.h>
@@ -370,9 +374,16 @@ int wc_CryptoCb_CryptInitRenesasCmn(WOLFSSL* ssl, void* ctx)
     if (cbInfo == NULL || ssl == NULL) {
         return INVALID_DEVID;
     }
-
-    cbInfo->devId = gdevId++;
-
+    /* need exclusive control because of static variable */
+    if ((cmn_hw_lock()) == 0) {
+        cbInfo->devId = gdevId++;
+        cmn_hw_unlock();
+    }
+    else {
+        WOLFSSL_MSG("Failed to lock tsip hw");
+        return INVALID_DEVID;
+    }
+    
     if (wc_CryptoCb_RegisterDevice(cbInfo->devId, 
                             Renesas_cmn_CryptoDevCb, cbInfo) < 0) {
         /* undo devId number */
@@ -537,7 +548,7 @@ WOLFSSL_LOCAL int Renesas_cmn_EccVerify(WOLFSSL* ssl, const unsigned char* sig,
  * key_e_start Byte position of public key exponent in cert
  * key_e_len   Length of public key exponent
  * cm_row      CA index
- * return FSP_SUCCESS(0) on success, otherwise FSP/TSIP error code
+ * return FSP_SUCCESS(0) on success, otherwise WOLFSSL_FATAL_ERROR
  */
 int wc_Renesas_cmn_RootCertVerify(const byte* cert, word32 cert_len, word32 key_n_start,
         word32 key_n_len, word32 key_e_start, word32 key_e_len, word32 cm_row)
@@ -551,17 +562,24 @@ int wc_Renesas_cmn_RootCertVerify(const byte* cert, word32 cert_len, word32 key_
     #if defined(WOLFSSL_RENESAS_TSIP_TLS)
         ret = wc_tsip_tls_RootCertVerify(cert, cert_len, key_n_start,
                 key_n_len, key_e_start, key_e_len, cm_row);
-
+        if (ret != TSIP_SUCCESS) {
+            ret = WOLFSSL_FATAL_ERROR;
+        }
     #elif defined(WOLFSSL_RENESAS_SCEPROTECT)
 
         ret = wc_sce_tls_RootCertVerify(cert, cert_len, key_n_start,
                 key_n_len, key_e_start, key_e_len, cm_row);
+        if (ret != FSP_SUCCESS) {
+            ret = WOLFSSL_FATAL_ERROR;
+        }
     #endif
+
     }
     else {
         /* already verified. skipped */
         ret = 0;
     }
+    WOLFSSL_LEAVE("wc_Renesas_cmn_RootCertVerify", ret);
     return ret;
 }
 
@@ -584,18 +602,17 @@ WOLFSSL_LOCAL int Renesas_cmn_TlsFinished(WOLFSSL* ssl, const byte *side,
 
     WOLFSSL_ENTER("Renesas_cmn_TlsFinished");
 
-
+    if (Renesas_cmn_usable(ssl, 1)) {
  #if defined(WOLFSSL_RENESAS_TSIP_TLS)
-    ret = wc_tsip_generateVerifyData(ssl->arrays->tsip_masterSecret,
+        ret = wc_tsip_generateVerifyData(ssl->arrays->tsip_masterSecret,
                             side, handshake_hash, hashes);
  #elif defined(WOLFSSL_RENESAS_SCEPROTECT)
-    if (Renesas_cmn_usable(ssl, 1)) {
          ret = wc_sce_generateVerifyData(ssl->arrays->sce_masterSecret,
                    side, handshake_hash, hashes);
+ #endif
     }
      else
          ret = PROTOCOLCB_UNAVAILABLE;
- #endif
 
     return ret;
 }
@@ -659,14 +676,17 @@ WOLFSSL_LOCAL int Renesas_cmn_generateSessionKey(WOLFSSL* ssl, void* ctx)
     (void)ctx;
  
     WOLFSSL_ENTER("Renesas_cmn_generateSessionKey");
+    if (Renesas_cmn_usable(ssl, 0)) {
 #if defined(WOLFSSL_RENESAS_TSIP_TLS)
         ret = wc_tsip_generateSessionKey(ssl, (TsipUserCtx*)ctx, cbInfo->devId);
 #elif defined(WOLFSSL_RENESAS_SCEPROTECT)
-    if (Renesas_cmn_usable(ssl, 0)) {
-         ret = wc_sce_generateSessionKey(ssl, ctx, cbInfo->devId);
-    } else
-         ret = PROTOCOLCB_UNAVAILABLE;
+        ret = wc_sce_generateSessionKey(ssl, ctx, cbInfo->devId);
 #endif
+    } 
+    else {
+         ret = PROTOCOLCB_UNAVAILABLE;
+    }
+    
     if (ret == 0) {
         wolfSSL_CTX_SetEncryptKeysCb(ssl->ctx, Renesas_cmn_EncryptKeys);
         wolfSSL_SetEncryptKeysCtx(ssl, ctx);

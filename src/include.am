@@ -652,6 +652,7 @@ endif
 
 if BUILD_LIBOQS
 src_libwolfssl_la_SOURCES += wolfcrypt/src/falcon.c
+src_libwolfssl_la_SOURCES += wolfcrypt/src/dilithium.c
 endif
 
 if BUILD_LIBZ
@@ -697,6 +698,14 @@ endif
 
 if BUILD_DTLS13
 src_libwolfssl_la_SOURCES += src/dtls13.c
+endif
+
+if BUILD_QUIC
+src_libwolfssl_la_SOURCES += src/quic.c
+endif
+
+if BUILD_DTLS_CID
+src_libwolfssl_la_SOURCES += src/dtls.c
 endif
 
 endif !BUILD_CRYPTONLY

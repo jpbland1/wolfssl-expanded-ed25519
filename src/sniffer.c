@@ -1,6 +1,6 @@
 /* sniffer.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2022 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -459,6 +459,9 @@ typedef struct Flags {
 #endif
     byte           gotFinished;     /* processed finished */
     byte           secRenegEn;      /* secure renegotiation enabled */
+#ifdef WOLFSSL_ASYNC_CRYPT
+    byte           wasPolled;
+#endif
 } Flags;
 
 
@@ -3362,6 +3365,7 @@ static int ProcessSessionTicket(const byte* input, int* sslBytes,
         if (session->sslServer->arrays) {
             XMEMCPY(session->sslServer->arrays->sessionID,
                 input + len - ID_LEN, ID_LEN);
+            session->sslServer->arrays->sessionIDSz = ID_LEN;
         }
     }
 
@@ -3386,6 +3390,11 @@ static int DoResume(SnifferSession* session, char* error)
     else
 #endif
     {
+    #ifdef HAVE_SESSION_TICKET
+        /* make sure "useTicket" is not set, otherwise the session will not be
+         * properly retrieved */
+        session->sslServer->options.useTicket = 0;
+    #endif
         resume = wolfSSL_GetSession(session->sslServer,
                                     session->sslServer->arrays->masterSecret, 0);
         if (resume == NULL) {
@@ -3698,6 +3707,7 @@ static int ProcessServerHello(int msgSz, const byte* input, int* sslBytes,
     if (session->ticketID && doResume) {
         /* use ticketID to retrieve from session, prefer over sessionID */
         XMEMCPY(session->sslServer->arrays->sessionID,session->ticketID,ID_LEN);
+        session->sslServer->arrays->sessionIDSz = ID_LEN;
         session->sslServer->options.haveSessionId = 1;  /* may not have
                                                            actual sessionID */
     }
@@ -4085,8 +4095,10 @@ static int ProcessClientHello(const byte* input, int* sslBytes,
                         return -1;
                     }
                 }
+
             #ifdef HAVE_SESSION_TICKET
-                ssl->options.useTicket = 1;
+                /* do not set "ssl->options.useTicket", since the sniffer uses
+                 * the cache differently for retaining the master secret only */
             #endif
                 XMEMCPY(session->ticketID, input + extLen - ID_LEN, ID_LEN);
             }
@@ -4781,7 +4793,7 @@ static const byte* DecryptMessage(WOLFSSL* ssl, const byte* input, word32 sz,
 
 #ifdef WOLFSSL_TLS13
     if (IsAtLeastTLSv1_3(ssl->version)) {
-        ret = DecryptTls13(ssl, output, input, sz, (byte*)rh, RECORD_HEADER_SZ, 0);
+        ret = DecryptTls13(ssl, output, input, sz, (byte*)rh, RECORD_HEADER_SZ);
     }
     else
 #endif
@@ -6383,6 +6395,14 @@ static int ssl_DecodePacketInternal(const byte* packet, int length, int isChain,
         return 0; /* done for now */
     }
 
+#ifdef WOLFSSL_ASYNC_CRYPT
+    /* make sure this server was polled */
+    if (asyncOkay && session->sslServer->error == WC_PENDING_E &&
+        !session->flags.wasPolled) {
+        return WC_PENDING_E;
+    }
+#endif
+
 #ifdef WOLFSSL_SNIFFER_STATS
     #ifdef WOLFSSL_ASYNC_CRYPT
     if (session->sslServer->error != WC_PENDING_E)
@@ -6410,6 +6430,7 @@ static int ssl_DecodePacketInternal(const byte* packet, int length, int isChain,
         session->pendSeq = tcpInfo.sequence;
 
         if (ret == WC_PENDING_E) {
+            session->flags.wasPolled = 0;
             if (!asyncOkay || CryptoDeviceId == INVALID_DEVID) {
                 /* If devId has not been set then we need to block here by
                  * polling and looping */
@@ -6810,11 +6831,28 @@ int ssl_DecodePacketAsync(void* packet, unsigned int packetSz,
         userCtx, error, 1);
 }
 
+static SnifferSession* FindSession(WOLFSSL* ssl)
+{
+    int i;
+    SnifferSession* session;
+    for (i = 0; i < HASH_SIZE; i++) {
+        session = SessionTable[i];
+        while (session) {
+            if (session->sslServer == ssl) {
+                return session;
+            }
+            session = session->next;
+        }
+    }
+    return NULL;
+}
+
 int ssl_PollSniffer(WOLF_EVENT** events, int maxEvents, WOLF_EVENT_FLAG flags,
     int* pEventCount)
 {
     int ret = 0;
     int eventCount = 0;
+    int i;
     SnifferServer* srv;
 
     wc_LockMutex(&ServerListMutex);
@@ -6839,7 +6877,20 @@ int ssl_PollSniffer(WOLF_EVENT** events, int maxEvents, WOLF_EVENT_FLAG flags,
         }
         srv = srv->next;
     }
+
     wc_UnLockMutex(&ServerListMutex);
+
+
+    /* iterate list and mark polled */
+    wc_LockMutex(&SessionMutex);
+    for (i=0; i<eventCount; i++) {
+        WOLFSSL* ssl = (WOLFSSL*)events[i]->context;
+        SnifferSession* session = FindSession(ssl);
+        if (session) {
+            session->flags.wasPolled = 1;
+        }
+    }
+    wc_UnLockMutex(&SessionMutex);
 
     *pEventCount = eventCount;
 

@@ -1,6 +1,6 @@
 /* chacha.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2022 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -47,6 +47,7 @@ or Authenticated Encryption with Additional Data (AEAD) algorithm.
 #endif
 
 #define CHACHA20_POLY1305_AEAD_INITIAL_COUNTER  0
+WOLFSSL_ABI
 int wc_ChaCha20Poly1305_Encrypt(
                 const byte inKey[CHACHA20_POLY1305_AEAD_KEYSIZE],
                 const byte inIV[CHACHA20_POLY1305_AEAD_IV_SIZE],
@@ -79,6 +80,7 @@ int wc_ChaCha20Poly1305_Encrypt(
     return ret;
 }
 
+WOLFSSL_ABI
 int wc_ChaCha20Poly1305_Decrypt(
                 const byte inKey[CHACHA20_POLY1305_AEAD_KEYSIZE],
                 const byte inIV[CHACHA20_POLY1305_AEAD_IV_SIZE],

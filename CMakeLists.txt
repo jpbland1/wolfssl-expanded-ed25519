@@ -44,7 +44,9 @@ set(LIBTOOL_FULL_VERSION ${LIBTOOL_SO_VERSION}.${LIBTOOL_AGE}.${LIBTOOL_REVISION
 
 set(WOLFSSL_DEFINITIONS)
 set(WOLFSSL_LINK_LIBS)
+set(WOLFSSL_INCLUDE_DIRS)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/")
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/functions.cmake)
 
 ####################################################
@@ -167,6 +169,8 @@ find_package(Threads)
 # Example for map file and custom linker script
 #set(CMAKE_EXE_LINKER_FLAGS " -Xlinker -Map=output.map -T\"${CMAKE_CURRENT_SOURCE_DIR}/linker.ld\"")
 
+set(CMAKE_C_FLAGS "-Wall -Wextra -Wno-unused -Werror ${CMAKE_C_FLAGS}")
+
 ####################################################
 # Build Options
 ####################################################
@@ -286,6 +290,18 @@ if(WOLFSSL_DTLS13)
     endif()
 endif()
 
+# DTLS ConnectionID support
+add_option("WOLFSSL_DTLS_CID"
+    "Enables wolfSSL DTLS CID (default: disabled)"
+    "no" "yes;no")
+
+if(WOLFSSL_DTLS_CID)
+    if(NOT WOLFSSL_DTLS13)
+        message(FATAL_ERROR "CID are supported only for DTLSv1.3")
+    endif()
+    list(APPEND WOLFSSL_DEFINITIONS "-DWOLFSSL_DTLS_CID")
+endif()
+
 # Post-handshake authentication
 add_option("WOLFSSL_POSTAUTH"
     "Enable wolfSSL Post-handshake Authentication (default: disabled)"
@@ -376,6 +392,24 @@ endif()
 # TODO: - IPv6 test apps
 
 set(WOLFSSL_SLOW_MATH "yes")
+
+# liboqs
+add_option(WOLFSSL_OQS
+    "Enable integration with the OQS (Open Quantum Safe) liboqs library (default: disabled)"
+    "no" "yes;no")
+
+if (WOLFSSL_OQS)
+    find_package(OQS)
+
+    if (OQS_FOUND)
+        list(APPEND WOLFSSL_LINK_LIBS ${OQS_LIBRARY})
+        list(APPEND WOLFSSL_INCLUDE_DIRS ${OQS_INCLUDE_DIR})
+        set(HAVE_LIBOQS 1)
+        list(APPEND WOLFSSL_DEFINITIONS
+          "-DHAVE_TLS_EXTENSIONS"
+          "-DHAVE_LIBOQS")
+    endif()
+endif()
 
 # TODO: - Lean PSK
 #       - Lean TLS
@@ -874,6 +908,7 @@ else()
 endif()
 if(WOLFSSL_RSA_PSS)
     list(APPEND WOLFSSL_DEFINITIONS "-DWC_RSA_PSS")
+    list(APPEND WOLFSSL_DEFINITIONS "-DWOLFSSL_PSS_LONG_SALT")
 endif()
 
 # DH
@@ -1803,6 +1838,7 @@ target_include_directories(wolfssl
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+        ${WOLFSSL_INCLUDE_DIRS}
 )
 
 ####################################################
@@ -2044,7 +2080,11 @@ endif()
 
 if(NOT BUILD_SP)
   list(APPEND HEADER_EXCLUDE
-    "wolfssl/wolfcrypt/sp.h"
+    "wolfssl/wolfcrypt/sp.h")
+endif()
+
+if(NOT BUILD_SP_INT)
+  list(APPEND HEADER_EXCLUDE
     "wolfssl/wolfcrypt/sp_int.h")
 endif()
 

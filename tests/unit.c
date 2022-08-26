@@ -1,6 +1,6 @@
 /* unit.c API unit tests driver
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2022 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -174,6 +174,15 @@ int unit_test(int argc, char** argv)
 
     }
 
+#ifdef WOLFSSL_QUIC
+    if ( (ret = QuicTest()) != 0){
+        printf("quic test failed with %d\n", ret);
+        goto exit;
+    }
+#endif
+
+    SrpTest();
+
 #ifndef NO_WOLFSSL_CIPHER_SUITE_TEST
 #if !defined(NO_WOLFSSL_CLIENT) && !defined(NO_WOLFSSL_SERVER)
 #ifndef SINGLE_THREADED
@@ -184,8 +193,6 @@ int unit_test(int argc, char** argv)
 #endif
 #endif
 #endif /* NO_WOLFSSL_CIPHER_SUITE_TEST */
-
-    SrpTest();
 
 exit:
 #ifdef HAVE_WNR

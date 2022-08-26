@@ -1,6 +1,6 @@
 /* error.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2022 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -34,6 +34,7 @@
 #endif
 
 #ifndef NO_ERROR_STRINGS
+WOLFSSL_ABI
 const char* wc_GetErrorString(int error)
 {
     switch (error) {

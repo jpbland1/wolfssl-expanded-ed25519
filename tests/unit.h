@@ -1,6 +1,6 @@
 /* unit.c API unit tests driver
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2022 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -118,6 +118,7 @@ int  SuiteTest(int argc, char** argv);
 int  HashTest(void);
 void SrpTest(void);
 int w64wrapper_test(void);
+int QuicTest(void);
 
 
 #endif /* CyaSSL_UNIT_H */

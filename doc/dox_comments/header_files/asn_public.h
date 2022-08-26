@@ -22,6 +22,66 @@
 int wc_InitCert(Cert*);
 
 /*!
+     \ingroup ASN
+
+     \brief This function allocates a new Cert structure for use during
+     cert operations without the application having to allocate the structure
+     itself. The Cert structure is also initialized by this function thus
+     removing the need to call wc_InitCert(). When the application is finished
+     using the allocated Cert structure wc_CertFree() must be called.
+
+     \return pointer If successful the call will return a pointer to the
+     newly allocated and initialized Cert.
+     \return NULL On a memory allocation failure.
+
+     \param A pointer to the heap used for dynamic allocation. Can be NULL.
+
+     _Example_
+     \code
+     Cert*   myCert;
+
+     myCert = wc_CertNew(NULL);
+     if (myCert == NULL) {
+         // Cert creation failure
+     }
+     \endcode
+
+     \sa wc_InitCert
+     \sa wc_MakeCert
+     \sa wc_CertFree
+
+*/
+Cert* wc_CertNew(void* heap);
+
+/*!
+     \ingroup ASN
+
+     \brief This function frees the memory allocated for a cert structure
+     by a previous call to wc_CertNew().
+
+     \return None.
+
+     \param A pointer to the cert structure to free.
+
+     _Example_
+     \code
+     Cert*   myCert;
+
+     myCert = wc_CertNew(NULL);
+
+     // Perform cert operations.
+
+     wc_CertFree(myCert);
+     \endcode
+
+     \sa wc_InitCert
+     \sa wc_MakeCert
+     \sa wc_CertNew
+
+*/
+void  wc_CertFree(Cert* cert);
+
+/*!
     \ingroup ASN
 
     \brief Used to make CA signed certs. Called after the subject information
@@ -133,7 +193,7 @@ int  wc_MakeCertReq(Cert* cert, byte* derBuffer, word32 derSz,
     \param requestSz the size of the certificate body we’re requesting
     to have signed
     \param sType Type of signature to create. Valid options are: CTC_MD5wRSA,
-    CTC_SHAwRSA, CTC_SHAwECDSA, CTC_SHA256wECDSA, andCTC_SHA256wRSA
+    CTC_SHAwRSA, CTC_SHAwECDSA, CTC_SHA256wECDSA, and CTC_SHA256wRSA
     \param buffer pointer to the buffer containing the certificate to be
     signed. On success: will hold the newly signed certificate
     \param buffSz the (total) size of the buffer in which to store the newly
@@ -903,7 +963,7 @@ int wc_SetAuthKeyId(Cert *cert, const char* file);
     \brief Set SKID from RSA or ECC public key.
 
     \return 0 Success
-    \return BAD_FUNC_ARG Returned if cert or rsakey and eckey is null.
+    \return BAD_FUNC_ARG Returned if cert or rsakey and eckey are null.
     \return MEMORY_E Returned if there is an error allocating memory.
     \return PUBLIC_KEY_E Returned if there is an error getting the public key.
 
@@ -1522,10 +1582,10 @@ int wc_EccPublicKeyToDer_ex(ecc_key* key, byte* output,
     Sha256 sha256;
     // initialize sha256 for hashing
 
-    byte* dig = = (byte*)malloc(SHA256_DIGEST_SIZE);
+    byte* dig = = (byte*)malloc(WC_SHA256_DIGEST_SIZE);
     // perform hashing and hash updating so dig stores SHA-256 hash
     // (see wc_InitSha256, wc_Sha256Update and wc_Sha256Final)
-    signSz = wc_EncodeSignature(encodedSig, dig, SHA256_DIGEST_SIZE,SHA256h);
+    signSz = wc_EncodeSignature(encodedSig, dig, WC_SHA256_DIGEST_SIZE, SHA256h);
     \endcode
 
     \sa none
@@ -1537,7 +1597,7 @@ word32 wc_EncodeSignature(byte* out, const byte* digest,
     \ingroup ASN
 
     \brief This function returns the hash OID that corresponds to a hashing
-    type. For example, when given the type: SHA512, this function returns the
+    type. For example, when given the type: WC_SHA512, this function returns the
     identifier corresponding to a SHA512 hash, SHA512h.
 
     \return Success On success, returns the OID corresponding to the
@@ -1545,14 +1605,14 @@ word32 wc_EncodeSignature(byte* out, const byte* digest,
     \return 0 Returned if an unrecognized hash type is passed in as argument.
 
     \param type the hash type for which to find the OID. Valid options,
-    depending on build configuration, include: MD2, MD5, SHA, SHA256, SHA512,
-    SHA384, and SHA512.
+    depending on build configuration, include: WC_MD5, WC_SHA, WC_SHA256,
+    WC_SHA384, WC_SHA512, WC_SHA3_224, WC_SHA3_256, WC_SHA3_384 or WC_SHA3_512
 
     _Example_
     \code
     int hashOID;
 
-    hashOID = wc_GetCTC_HashOID(SHA512);
+    hashOID = wc_GetCTC_HashOID(WC_SHA512);
     if (hashOID == 0) {
 	    // WOLFSSL_SHA512 not defined
     }
@@ -1994,7 +2054,7 @@ time_t wc_Time(time_t* t);
     \param cert Pointer to an initialized DecodedCert object.
     \param critical If 0, the extension will not be marked critical, otherwise
      it will be marked critical.
-    \param oid Dot separted oid as a string. For example "1.2.840.10045.3.1.7"
+    \param oid Dot separated oid as a string. For example "1.2.840.10045.3.1.7"
     \param der The der encoding of the content of the extension.
     \param derSz The size in bytes of the der encoding.
 
@@ -2080,7 +2140,7 @@ int wc_SetCustomExtension(Cert *cert, int critical, const char *oid,
     \sa ParseCert
     \sa wc_SetCustomExtension
 */
-WOLFSSL_ASN_API int wc_SetUnknownExtCallback(DecodedCert* cert,
+int wc_SetUnknownExtCallback(DecodedCert* cert,
                                              wc_UnknownExtCallback cb);
 /*!
     \ingroup ASN
@@ -2099,8 +2159,7 @@ WOLFSSL_ASN_API int wc_SetUnknownExtCallback(DecodedCert* cert,
     \param pubKeySz The size in bytes of pubKey.
     \param pubKeyOID OID identifying the algorithm of the public key.
     (ie: ECDSAk, DSAk or RSAk)
-
+*/
 int wc_CheckCertSigPubKey(const byte* cert, word32 certSz,
                                       void* heap, const byte* pubKey,
                                       word32 pubKeySz, int pubKeyOID);
-*/
