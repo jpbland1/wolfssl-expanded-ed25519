@@ -22,6 +22,10 @@
 
  /* Based On Daniel J Bernstein's ed25519 Public Domain ref10 work. */
 
+// CUSTOM
+#include <unistd.h>
+#include <errno.h>
+
 #ifdef HAVE_CONFIG_H
     #include <config.h>
 #endif
@@ -183,12 +187,25 @@ int wc_ed25519_make_public(ed25519_key* key, unsigned char* pubKey,
         ret = BAD_FUNC_ARG;
 
     if (ret == 0)
+    {
+      if ( key->expanded == 1 )
+      {
+        XMEMCPY( az, key->k, ED25519_PRV_KEY_SIZE );
+      }
+      else
+      {
         ret = ed25519_hash(key, key->k, ED25519_KEY_SIZE, az);
+      }
+    }
+
     if (ret == 0) {
-        /* apply clamp */
-        az[0]  &= 248;
-        az[31] &= 63; /* same than az[31] &= 127 because of az[31] |= 64 */
-        az[31] |= 64;
+        if ( key->expanded == 0 && key->no_clamp == 0 )
+        {
+          /* apply clamp */
+          az[0]  &= 248;
+          az[31] &= 63; /* same than az[31] &= 127 because of az[31] |= 64 */
+          az[31] |= 64;
+        }
 
     #ifdef FREESCALE_LTC_ECC
         ltc_pkha_ecc_point_t publicKey = {0};
@@ -311,14 +328,27 @@ int wc_ed25519_sign_msg_ex(const byte* in, word32 inLen, byte* out,
 
     /* step 1: create nonce to use where nonce is r in
        r = H(h_b, ... ,h_2b-1,M) */
-    ret = ed25519_hash(key, key->k, ED25519_KEY_SIZE, az);
+
+    if ( key->expanded == 1 )
+    {
+      XMEMCPY( az, key->k, ED25519_PRV_KEY_SIZE );
+      ret = 0;
+    }
+    else
+    {
+      ret = ed25519_hash(key, key->k, ED25519_KEY_SIZE, az);
+    }
+
     if (ret != 0)
         return ret;
 
-    /* apply clamp */
-    az[0]  &= 248;
-    az[31] &= 63; /* same than az[31] &= 127 because of az[31] |= 64 */
-    az[31] |= 64;
+    if ( key->expanded == 0 && key->no_clamp == 0 )
+    {
+      /* apply clamp */
+      az[0]  &= 248;
+      az[31] &= 63; /* same than az[31] &= 127 because of az[31] |= 64 */
+      az[31] |= 64;
+    }
 
     {
 #ifdef WOLFSSL_ED25519_PERSISTENT_SHA
@@ -417,6 +447,193 @@ int wc_ed25519_sign_msg_ex(const byte* in, word32 inLen, byte* out,
     sc_muladd(out + (ED25519_SIG_SIZE/2), hram, az, nonce);
 #endif
 #endif /* WOLFSSL_SE050 */
+    return ret;
+}
+
+// CUSTOM
+/*
+    in_fd       file descriptor that contains message to sign
+    out         is the buffer to write the signature
+    outLen      [in/out] input size of out buf
+                          output gets set as the final length of out
+    key         is the ed25519 key to use when signing
+    return 0 on success
+ */
+int ed25519_sign_msg_custom( int in_fd, byte* out, word32 *outLen, ed25519_key* key)
+{
+    int    ret;
+#ifdef FREESCALE_LTC_ECC
+    byte   tempBuf[ED25519_PRV_KEY_SIZE];
+    ltc_pkha_ecc_point_t ltcPoint = {0};
+#else
+    ge_p3  R;
+#endif
+    byte   nonce[WC_SHA512_DIGEST_SIZE];
+    byte   hram[WC_SHA512_DIGEST_SIZE];
+    byte   az[ED25519_PRV_KEY_SIZE];
+    byte in_buff[256];
+
+    /* sanity check on arguments */
+    if ( in_fd <= 0 || out == NULL || outLen == NULL || key == NULL )
+    {
+      return BAD_FUNC_ARG;
+    }
+
+    if (!key->pubKeySet)
+        return BAD_FUNC_ARG;
+
+    /* check and set up out length */
+    if (*outLen < ED25519_SIG_SIZE) {
+        *outLen = ED25519_SIG_SIZE;
+        return BUFFER_E;
+    }
+    *outLen = ED25519_SIG_SIZE;
+
+    /* step 1: create nonce to use where nonce is r in
+       r = H(h_b, ... ,h_2b-1,M) */
+    if ( key->expanded == 1 )
+    {
+      XMEMCPY( az, key->k, ED25519_PRV_KEY_SIZE );
+      ret = 0;
+    }
+    else
+    {
+      ret = ed25519_hash(key, key->k, ED25519_KEY_SIZE, az);
+    }
+
+    if (ret != 0)
+        return ret;
+
+    if ( key->expanded == 0 && key->no_clamp == 0 )
+    {
+      /* apply clamp */
+      az[0]  &= 248;
+      az[31] &= 63; /* same than az[31] &= 127 because of az[31] |= 64 */
+      az[31] |= 64;
+    }
+
+    {
+#ifdef WOLFSSL_ED25519_PERSISTENT_SHA
+        wc_Sha512 *sha = &key->sha;
+#else
+        wc_Sha512 sha[1];
+        ret = ed25519_hash_init(key, sha);
+        if (ret < 0)
+            return ret;
+#endif
+
+        if (ret == 0)
+            ret = ed25519_hash_update(key, sha, az + ED25519_KEY_SIZE,
+                                      ED25519_KEY_SIZE);
+        // read the contents of the file instead of the in buffer
+        if ( ret == 0 )
+        {
+          ret = lseek( in_fd, 0, SEEK_SET );
+        }
+
+        if ( ret == 0 )
+        {
+          do
+          {
+            ret = read( in_fd, in_buff, sizeof( in_buff ) );
+
+            if ( ret <= 0 )
+            {
+              break;
+            }
+
+            if ( ed25519_hash_update( key, sha, in_buff, ret ) != 0 )
+            {
+              ret = -1;
+              break;
+            }
+          } while ( ret == sizeof( in_buff ) );
+        }
+
+        if (ret >= 0)
+            ret = ed25519_hash_final(key, sha, nonce);
+#ifndef WOLFSSL_ED25519_PERSISTENT_SHA
+        ed25519_hash_free(key, sha);
+#endif
+    }
+
+    if (ret != 0)
+        return ret;
+
+#ifdef FREESCALE_LTC_ECC
+    ltcPoint.X = &tempBuf[0];
+    ltcPoint.Y = &tempBuf[32];
+    LTC_PKHA_sc_reduce(nonce);
+    LTC_PKHA_Ed25519_PointMul(LTC_PKHA_Ed25519_BasePoint(), nonce,
+           ED25519_KEY_SIZE, &ltcPoint, kLTC_Ed25519 /* result on Ed25519 */);
+    LTC_PKHA_Ed25519_Compress(&ltcPoint, out);
+#else
+    sc_reduce(nonce);
+
+    /* step 2: computing R = rB where rB is the scalar multiplication of
+       r and B */
+    ge_scalarmult_base(&R,nonce);
+    ge_p3_tobytes(out,&R);
+#endif
+
+    /* step 3: hash R + public key + message getting H(R,A,M) then
+       creating S = (r + H(R,A,M)a) mod l */
+    {
+#ifdef WOLFSSL_ED25519_PERSISTENT_SHA
+        wc_Sha512 *sha = &key->sha;
+#else
+        wc_Sha512 sha[1];
+        ret = ed25519_hash_init(key, sha);
+        if (ret < 0)
+            return ret;
+#endif
+
+        if (ret == 0)
+            ret = ed25519_hash_update(key, sha, out, ED25519_SIG_SIZE/2);
+        if (ret == 0)
+            ret = ed25519_hash_update(key, sha, key->p, ED25519_PUB_KEY_SIZE);
+
+        if ( ret == 0 )
+        {
+          ret = lseek( in_fd, 0, SEEK_SET );
+        }
+
+        if ( ret == 0 )
+        {
+          do
+          {
+            ret = read( in_fd, in_buff, sizeof( in_buff ) );
+
+            if ( ret <= 0 )
+            {
+              break;
+            }
+
+            if ( ed25519_hash_update( key, sha, in_buff, ret ) != 0 )
+            {
+              ret = -1;
+              break;
+            }
+          } while ( ret == sizeof( in_buff ) );
+        }
+
+        if (ret >= 0)
+            ret = ed25519_hash_final(key, sha, hram);
+#ifndef WOLFSSL_ED25519_PERSISTENT_SHA
+        ed25519_hash_free(key, sha);
+#endif
+    }
+
+    if (ret != 0)
+        return ret;
+
+#ifdef FREESCALE_LTC_ECC
+    LTC_PKHA_sc_reduce(hram);
+    LTC_PKHA_sc_muladd(out + (ED25519_SIG_SIZE/2), hram, az, nonce);
+#else
+    sc_reduce(hram);
+    sc_muladd(out + (ED25519_SIG_SIZE/2), hram, az, nonce);
+#endif
     return ret;
 }
 

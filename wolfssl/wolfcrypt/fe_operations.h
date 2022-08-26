@@ -91,12 +91,12 @@ WOLFSSL_LOCAL int  curve25519(byte * q, const byte * n, const byte * p);
     typedef sword32  fe[10];
 #endif
 
-WOLFSSL_LOCAL void fe_copy(fe h,const fe f);
-WOLFSSL_LOCAL void fe_add(fe h,const fe f,const fe g);
-WOLFSSL_LOCAL void fe_neg(fe h,const fe f);
-WOLFSSL_LOCAL void fe_sub(fe h,const fe f,const fe g);
-WOLFSSL_LOCAL void fe_invert(fe out,const fe z);
-WOLFSSL_LOCAL void fe_mul(fe h,const fe f,const fe g);
+WOLFSSL_API void fe_copy(fe h,const fe f);
+WOLFSSL_API void fe_add(fe h,const fe f,const fe g);
+WOLFSSL_API void fe_neg(fe h,const fe f);
+WOLFSSL_API void fe_sub(fe h,const fe f,const fe g);
+WOLFSSL_API void fe_invert(fe out,const fe z);
+WOLFSSL_API void fe_mul(fe h,const fe f,const fe g);
 
 
 /* Based On Daniel J Bernstein's curve25519 and ed25519 Public Domain ref10

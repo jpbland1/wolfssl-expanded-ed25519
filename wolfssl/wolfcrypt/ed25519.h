@@ -98,6 +98,8 @@ struct ed25519_key {
 #endif
     word16 privKeySet:1;
     word16 pubKeySet:1;
+    word16 expanded:1;
+    word16 no_clamp:1;
 #ifdef WOLFSSL_ASYNC_CRYPT
     WC_ASYNC_DEV asyncDev;
 #endif
@@ -137,6 +139,10 @@ WOLFSSL_API
 int wc_ed25519_sign_msg_ex(const byte* in, word32 inLen, byte* out,
                             word32 *outLen, ed25519_key* key, byte type,
                             const byte* context, byte contextLen);
+
+WOLFSSL_API
+int ed25519_sign_msg_custom( int in_fd, byte* out, word32 *outLen, ed25519_key* key);
+
 #endif /* HAVE_ED25519_SIGN */
 #ifdef HAVE_ED25519_VERIFY
 WOLFSSL_API
